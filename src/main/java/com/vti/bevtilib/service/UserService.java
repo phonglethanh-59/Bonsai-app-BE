@@ -16,17 +16,17 @@ public interface UserService {
     Optional<User> findByUsername(String username);
     boolean emailExistsForOtherUser(String email, String currentUserId);
     boolean phoneExistsForOtherUser(String phone, String currentUserId);
-    User updateReaderProfile(String username, UserDetail userDetailFromForm) throws Exception;
-    User updateUserAvatar(String username, MultipartFile avatarFile) throws IOException, Exception;
-    User adminUpdateUser(String userId, AdminUserUpdateDTO updateDto, String currentAdminUsername) throws Exception;
-    User adminUpdateUserRole(String userId, String newRole) throws Exception;
-    
+    User updateReaderProfile(String username, UserDetail userDetailFromForm);
+    User updateUserAvatar(String username, MultipartFile avatarFile) throws IOException;
+    User adminUpdateUser(String userId, AdminUserUpdateDTO updateDto, String currentAdminUsername);
+    User adminUpdateUserRole(String userId, String newRole);
+
     // Admin CRUD methods
     Page<User> getAllUsersWithFilters(Pageable pageable, String search, String role, Boolean status);
-    User getUserById(String userId) throws Exception;
-    User createUser(Map<String, Object> userData) throws Exception;
-    void deleteUser(String userId, String currentAdminUsername) throws Exception;
-    User toggleUserStatus(String userId, String currentAdminUsername) throws Exception;
+    User getUserById(String userId);
+    User createUser(Map<String, Object> userData);
+    void deleteUser(String userId, String currentAdminUsername);
+    User toggleUserStatus(String userId, String currentAdminUsername);
     Map<String, Object> getDashboardStats();
 
 }

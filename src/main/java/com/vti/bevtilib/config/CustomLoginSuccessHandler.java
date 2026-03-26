@@ -5,7 +5,7 @@ import com.vti.bevtilib.service.UserService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
@@ -15,10 +15,16 @@ import java.io.IOException;
 import java.util.Collection;
 
 @Component
-@RequiredArgsConstructor
 public class CustomLoginSuccessHandler implements AuthenticationSuccessHandler {
 
     private final UserService userService;
+    private final String frontendUrl;
+
+    public CustomLoginSuccessHandler(UserService userService,
+                                     @Value("${app.frontend-url}") String frontendUrl) {
+        this.userService = userService;
+        this.frontendUrl = frontendUrl;
+    }
 
     @Override
     public void onAuthenticationSuccess(HttpServletRequest request,
@@ -39,17 +45,17 @@ public class CustomLoginSuccessHandler implements AuthenticationSuccessHandler {
             }
         });
 
-        String redirectURL = "http://localhost:3000/";
+        String redirectURL = frontendUrl + "/";
 
         Collection<? extends GrantedAuthority> authorities = authentication.getAuthorities();
         for (GrantedAuthority authority : authorities) {
             String role = authority.getAuthority();
             switch (role) {
                 case "ROLE_ADMIN":
-                    redirectURL = "http://localhost:3000/admin/dashboard";
+                    redirectURL = frontendUrl + "/admin/dashboard";
                     break;
                 case "ROLE_STAFF":
-                    redirectURL = "http://localhost:3000/staff/home";
+                    redirectURL = frontendUrl + "/staff/home";
                     break;
             }
             break;

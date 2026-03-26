@@ -2,14 +2,12 @@ package com.vti.bevtilib.config;
 
 import com.vti.bevtilib.service.CustomUserDetailsService;
 import jakarta.servlet.http.HttpServletResponse;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
@@ -18,15 +16,18 @@ import java.util.Arrays;
 
 @Configuration
 @EnableMethodSecurity(prePostEnabled = true)
-@RequiredArgsConstructor
 public class SecurityConfig {
 
     private final CustomLoginSuccessHandler loginSuccessHandler;
     private final CustomUserDetailsService userDetailsService;
+    private final String frontendUrl;
 
-    @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
+    public SecurityConfig(CustomLoginSuccessHandler loginSuccessHandler,
+                          CustomUserDetailsService userDetailsService,
+                          @Value("${app.frontend-url}") String frontendUrl) {
+        this.loginSuccessHandler = loginSuccessHandler;
+        this.userDetailsService = userDetailsService;
+        this.frontendUrl = frontendUrl;
     }
 
     @Bean
@@ -62,12 +63,12 @@ public class SecurityConfig {
                         .loginPage("/auth/login")
                         .loginProcessingUrl("/auth/login")
                         .successHandler(loginSuccessHandler)
-                        .failureUrl("http://localhost:3000/login?error=true")
+                        .failureUrl(frontendUrl + "/login?error=true")
                         .permitAll()
                 )
                 .logout(logout -> logout
                         .logoutUrl("/auth/logout")
-                        .logoutSuccessUrl("http://localhost:3000/")
+                        .logoutSuccessUrl(frontendUrl + "/")
                         .permitAll()
                 );
         return http.build();
@@ -76,7 +77,7 @@ public class SecurityConfig {
     @Bean
     CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(Arrays.asList("http://localhost:3000"));
+        configuration.setAllowedOrigins(Arrays.asList(frontendUrl));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("*"));
         configuration.setAllowCredentials(true);

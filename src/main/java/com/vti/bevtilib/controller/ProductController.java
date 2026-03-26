@@ -1,7 +1,6 @@
 package com.vti.bevtilib.controller;
 
 import com.vti.bevtilib.dto.ProductDTO;
-import com.vti.bevtilib.model.Product;
 import com.vti.bevtilib.model.Category;
 import com.vti.bevtilib.service.ProductService;
 import lombok.RequiredArgsConstructor;
@@ -13,6 +12,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Set;
 
 @RestController
 @RequestMapping("/api")
@@ -20,6 +20,10 @@ import java.util.List;
 public class ProductController {
 
     private final ProductService productService;
+
+    private static final Set<String> ALLOWED_SORT_FIELDS = Set.of(
+            "createdAt", "price", "name", "averageRating", "reviewCount", "stockQuantity"
+    );
 
     @GetMapping("/products")
     public ResponseEntity<Page<ProductDTO>> getProducts(
@@ -35,9 +39,15 @@ public class ProductController {
             @RequestParam(defaultValue = "createdAt,desc") String sort) {
 
         String[] sortParams = sort.split(",");
+        String sortField = sortParams[0];
+        if (!ALLOWED_SORT_FIELDS.contains(sortField)) {
+            sortField = "createdAt";
+        }
         Sort.Direction direction = sortParams.length > 1 && sortParams[1].equalsIgnoreCase("asc")
                 ? Sort.Direction.ASC : Sort.Direction.DESC;
-        Pageable pageable = PageRequest.of(page, size, Sort.by(direction, sortParams[0]));
+        // Giới hạn page size tối đa 100
+        size = Math.min(size, 100);
+        Pageable pageable = PageRequest.of(Math.max(page, 0), Math.max(size, 1), Sort.by(direction, sortField));
 
         Page<ProductDTO> productPage = productService.listAllProducts(keyword, categoryId, availability,
                 minRating, priceMin, priceMax, careLevel, pageable);
@@ -50,9 +60,14 @@ public class ProductController {
     }
 
     @GetMapping("/products/{id}")
-    public ResponseEntity<Product> getProductById(@PathVariable Long id) {
-        return productService.getProductById(id)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+    public ResponseEntity<ProductDTO> getProductById(@PathVariable Long id) {
+        ProductDTO dto = productService.getProductDtoById(id);
+        return ResponseEntity.ok(dto);
+    }
+
+    @GetMapping("/products/{id}/related")
+    public ResponseEntity<List<ProductDTO>> getRelatedProducts(@PathVariable Long id) {
+        List<ProductDTO> related = productService.getRelatedProducts(id);
+        return ResponseEntity.ok(related);
     }
 }

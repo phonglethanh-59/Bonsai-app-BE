@@ -19,23 +19,19 @@ public class StaffController {
     private final OrderService orderService;
 
     @GetMapping("/orders")
-    public ResponseEntity<?> getAllOrders(
+    public ResponseEntity<Page<OrderDTO>> getAllOrders(
             @RequestParam(required = false) String status,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
-        Pageable pageable = PageRequest.of(page, size);
+        Pageable pageable = PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), 100));
         Page<OrderDTO> orders = orderService.getAllOrders(status, pageable);
         return ResponseEntity.ok(orders);
     }
 
     @PutMapping("/orders/{id}/status")
     public ResponseEntity<?> updateOrderStatus(@PathVariable Long id, @RequestBody Map<String, String> payload) {
-        try {
-            String status = payload.get("status");
-            OrderDTO order = orderService.updateOrderStatus(id, status);
-            return ResponseEntity.ok(Map.of("message", "Cập nhật trạng thái đơn hàng thành công!", "order", order));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
-        }
+        String status = payload.get("status");
+        OrderDTO order = orderService.updateOrderStatus(id, status);
+        return ResponseEntity.ok(Map.of("message", "Cập nhật trạng thái đơn hàng thành công!", "order", order));
     }
 }

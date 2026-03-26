@@ -1,12 +1,16 @@
 package com.vti.bevtilib.service;
 
 import com.vti.bevtilib.dto.ReviewDTO;
+import com.vti.bevtilib.exception.BusinessException;
+import com.vti.bevtilib.exception.ResourceNotFoundException;
 import com.vti.bevtilib.model.Product;
 import com.vti.bevtilib.model.Review;
 import com.vti.bevtilib.model.User;
 import com.vti.bevtilib.repository.ProductRepository;
 import com.vti.bevtilib.repository.ReviewRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,14 +35,25 @@ public class ReviewServiceImpl implements ReviewService {
     }
 
     @Override
+    public Page<ReviewDTO> getReviewsForProduct(Long productId, Pageable pageable) {
+        return reviewRepository.findByProduct_IdOrderByReviewDateDesc(productId, pageable)
+                .map(this::convertToDto);
+    }
+
+    @Override
     @Transactional
-    public ReviewDTO createReview(User user, Long productId, int rating, String comment) throws Exception {
+    public ReviewDTO createReview(User user, Long productId, int rating, String comment) {
+        // Validate rating range
+        if (rating < 1 || rating > 5) {
+            throw new BusinessException("Rating phải từ 1 đến 5.");
+        }
+
         if (reviewRepository.existsByProduct_IdAndUser_UserId(productId, user.getUserId())) {
-            throw new Exception("Bạn đã đánh giá sản phẩm này rồi.");
+            throw new BusinessException("Bạn đã đánh giá sản phẩm này rồi.");
         }
 
         Product product = productRepository.findById(productId)
-                .orElseThrow(() -> new Exception("Không tìm thấy sản phẩm."));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy sản phẩm."));
 
         Review review = new Review();
         review.setUser(user);
@@ -48,11 +63,9 @@ public class ReviewServiceImpl implements ReviewService {
 
         Review savedReview = reviewRepository.save(review);
 
-        // Cập nhật rating trung bình cho sản phẩm
-        List<Review> allReviews = reviewRepository.findByProduct_IdOrderByReviewDateDesc(productId);
-        double avgRating = allReviews.stream().mapToInt(Review::getRating).average().orElse(0.0);
-        product.setAverageRating(avgRating);
-        product.setReviewCount(allReviews.size());
+        // Cập nhật rating trung bình bằng DB aggregate (tránh load hết review)
+        product.setAverageRating(reviewRepository.averageRatingByProductId(productId));
+        product.setReviewCount(reviewRepository.countByProductId(productId));
         productRepository.save(product);
 
         return convertToDto(savedReview);

@@ -47,7 +47,7 @@ public class Order {
     @Column(length = 20, nullable = false)
     private OrderStatus status = OrderStatus.PENDING;
 
-    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
+    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<OrderItem> orderItems = new ArrayList<>();
 
     public void addOrderItem(OrderItem item) {

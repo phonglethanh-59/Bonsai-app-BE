@@ -1,3 +1,10 @@
+-- Admin account (username: admin, password: 123456)
+INSERT IGNORE INTO users (user_id, username, password, role, status, created_at) VALUES
+('U0001', 'admin', '$2a$12$gga6/JBsOQsLvoG5zqaLZuMoUj2MhO4cs73fOetmtp30xV8vvb0tG', 'ADMIN', true, NOW());
+
+INSERT IGNORE INTO user_details (full_name, email, phone, gender, user_id) VALUES
+('Administrator', 'admin@bonsaishop.com', '0123456789', 'Nam', 'U0001');
+
 -- Categories
 INSERT IGNORE INTO categories (id, name, description) VALUES
 (1, 'Bonsai trong nhà', 'Các loại bonsai phù hợp để trưng bày trong nhà, văn phòng'),

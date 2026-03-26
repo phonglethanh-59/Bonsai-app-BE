@@ -19,6 +19,9 @@ public class ProductSpecification {
             List<Predicate> predicates = new ArrayList<>();
             query.distinct(true);
 
+            // Luôn lọc sản phẩm đã bị xóa mềm
+            predicates.add(cb.isFalse(root.get("deleted")));
+
             if (StringUtils.hasText(keyword)) {
                 String likePattern = "%" + keyword.toLowerCase() + "%";
                 predicates.add(cb.or(

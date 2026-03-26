@@ -7,15 +7,15 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
 import java.util.List;
-import java.util.Optional;
 
 public interface ProductService {
     Page<ProductDTO> listAllProducts(String keyword, Long categoryId, String availability,
                                      Double minRating, Double priceMin, Double priceMax,
                                      String careLevel, Pageable pageable);
     List<Category> getAllCategories();
-    Optional<Product> getProductById(Long id);
+    ProductDTO getProductDtoById(Long id);
     Product createProduct(Product product);
-    Product updateProduct(Long id, Product product) throws Exception;
-    void deleteProduct(Long id) throws Exception;
+    Product updateProduct(Long id, Product product);
+    void deleteProduct(Long id);
+    List<ProductDTO> getRelatedProducts(Long productId);
 }

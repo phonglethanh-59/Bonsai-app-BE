@@ -1,11 +1,14 @@
 package com.vti.bevtilib.controller;
 
+import com.vti.bevtilib.exception.ResourceNotFoundException;
 import com.vti.bevtilib.model.User;
 import com.vti.bevtilib.model.UserDetail;
 import com.vti.bevtilib.service.UserService;
 import com.vti.bevtilib.service.OrderService;
 import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -37,46 +40,37 @@ public class CustomerController {
     public ResponseEntity<?> handleProfileUpdate(Authentication authentication,
                                                  @RequestBody UserDetail userDetailFromForm,
                                                  HttpSession session) {
-        try {
-            String username = authentication.getName();
-            User updatedUser = userService.updateReaderProfile(username, userDetailFromForm);
-            session.removeAttribute("showFirstLoginPopup");
-            return ResponseEntity.ok(Map.of(
-                    "message", "Cập nhật thông tin thành công!",
-                    "updatedUser", updatedUser
-            ));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
-        }
+        String username = authentication.getName();
+        User updatedUser = userService.updateReaderProfile(username, userDetailFromForm);
+        session.removeAttribute("showFirstLoginPopup");
+        return ResponseEntity.ok(Map.of(
+                "message", "Cập nhật thông tin thành công!",
+                "updatedUser", updatedUser
+        ));
     }
 
     @PostMapping("/profile/avatar")
-    public ResponseEntity<?> uploadAvatar(Authentication authentication, @RequestParam("avatarFile") MultipartFile file) {
+    public ResponseEntity<?> uploadAvatar(Authentication authentication, @RequestParam("avatarFile") MultipartFile file) throws IOException {
         if (file.isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of("message", "Vui lòng chọn một file ảnh."));
         }
-        try {
-            String username = authentication.getName();
-            User updatedUser = userService.updateUserAvatar(username, file);
-            return ResponseEntity.ok(Map.of(
-                    "message", "Cập nhật ảnh đại diện thành công!",
-                    "avatarUrl", updatedUser.getUserDetail().getAvatar()
-            ));
-        } catch (IOException e) {
-            return ResponseEntity.status(500).body(Map.of("message", "Lỗi khi tải file lên."));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
-        }
+        String username = authentication.getName();
+        User updatedUser = userService.updateUserAvatar(username, file);
+        return ResponseEntity.ok(Map.of(
+                "message", "Cập nhật ảnh đại diện thành công!",
+                "avatarUrl", updatedUser.getUserDetail().getAvatar()
+        ));
     }
 
     @GetMapping("/orders")
-    public ResponseEntity<?> getMyOrders(Authentication authentication) {
-        try {
-            User user = userService.findByUsername(authentication.getName())
-                    .orElseThrow(() -> new Exception("Không tìm thấy người dùng"));
-            return ResponseEntity.ok(orderService.getOrdersForUser(user));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
-        }
+    public ResponseEntity<?> getMyOrders(
+            Authentication authentication,
+            @RequestParam(required = false) String status,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        User user = userService.findByUsername(authentication.getName())
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng"));
+        Pageable pageable = PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), 100));
+        return ResponseEntity.ok(orderService.getOrdersForUser(user, status, pageable));
     }
 }

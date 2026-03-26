@@ -1,12 +1,16 @@
 package com.vti.bevtilib.service;
 
 import com.vti.bevtilib.dto.CartItemDTO;
+import com.vti.bevtilib.exception.BusinessException;
+import com.vti.bevtilib.exception.ResourceNotFoundException;
 import com.vti.bevtilib.model.CartItem;
 import com.vti.bevtilib.model.Product;
 import com.vti.bevtilib.model.User;
 import com.vti.bevtilib.repository.CartItemRepository;
 import com.vti.bevtilib.repository.ProductRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,19 +29,30 @@ public class CartServiceImpl implements CartService {
     @Override
     @Transactional(readOnly = true)
     public List<CartItemDTO> getCartItems(User user) {
-        return cartItemRepository.findByUserOrderByCreatedAtDesc(user)
+        return cartItemRepository.findByUserWithProduct(user)
                 .stream()
                 .map(this::convertToDto)
                 .collect(Collectors.toList());
     }
 
     @Override
-    public CartItemDTO addToCart(User user, Long productId, int quantity) throws Exception {
+    @Transactional(readOnly = true)
+    public Page<CartItemDTO> getCartItems(User user, Pageable pageable) {
+        return cartItemRepository.findByUserWithProduct(user, pageable)
+                .map(this::convertToDto);
+    }
+
+    @Override
+    public CartItemDTO addToCart(User user, Long productId, int quantity) {
+        if (quantity <= 0) {
+            throw new BusinessException("Số lượng phải lớn hơn 0.");
+        }
+
         Product product = productRepository.findById(productId)
-                .orElseThrow(() -> new Exception("Không tìm thấy sản phẩm."));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy sản phẩm."));
 
         if (product.getStockQuantity() < quantity) {
-            throw new Exception("Sản phẩm chỉ còn " + product.getStockQuantity() + " trong kho.");
+            throw new BusinessException("Sản phẩm chỉ còn " + product.getStockQuantity() + " trong kho.");
         }
 
         Optional<CartItem> existing = cartItemRepository.findByUserAndProduct_Id(user, productId);
@@ -46,7 +61,7 @@ public class CartServiceImpl implements CartService {
             cartItem = existing.get();
             int newQty = cartItem.getQuantity() + quantity;
             if (newQty > product.getStockQuantity()) {
-                throw new Exception("Tổng số lượng trong giỏ vượt quá tồn kho.");
+                throw new BusinessException("Tổng số lượng trong giỏ vượt quá tồn kho.");
             }
             cartItem.setQuantity(newQty);
         } else {
@@ -60,18 +75,17 @@ public class CartServiceImpl implements CartService {
     }
 
     @Override
-    public CartItemDTO updateCartItem(User user, Long productId, int quantity) throws Exception {
-        CartItem cartItem = cartItemRepository.findByUserAndProduct_Id(user, productId)
-                .orElseThrow(() -> new Exception("Sản phẩm không có trong giỏ hàng."));
-
+    public CartItemDTO updateCartItem(User user, Long productId, int quantity) {
         if (quantity <= 0) {
-            cartItemRepository.delete(cartItem);
-            return null;
+            throw new BusinessException("Số lượng phải lớn hơn 0. Dùng API xóa sản phẩm khỏi giỏ hàng.");
         }
+
+        CartItem cartItem = cartItemRepository.findByUserAndProduct_Id(user, productId)
+                .orElseThrow(() -> new ResourceNotFoundException("Sản phẩm không có trong giỏ hàng."));
 
         Product product = cartItem.getProduct();
         if (quantity > product.getStockQuantity()) {
-            throw new Exception("Số lượng vượt quá tồn kho (" + product.getStockQuantity() + ").");
+            throw new BusinessException("Số lượng vượt quá tồn kho (" + product.getStockQuantity() + ").");
         }
 
         cartItem.setQuantity(quantity);
@@ -79,9 +93,9 @@ public class CartServiceImpl implements CartService {
     }
 
     @Override
-    public void removeFromCart(User user, Long productId) throws Exception {
+    public void removeFromCart(User user, Long productId) {
         CartItem cartItem = cartItemRepository.findByUserAndProduct_Id(user, productId)
-                .orElseThrow(() -> new Exception("Sản phẩm không có trong giỏ hàng."));
+                .orElseThrow(() -> new ResourceNotFoundException("Sản phẩm không có trong giỏ hàng."));
         cartItemRepository.delete(cartItem);
     }
 

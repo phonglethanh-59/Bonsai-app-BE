@@ -74,6 +74,9 @@ public class Product {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
+    @Version
+    private Long version;
+
     @Column(name = "average_rating")
     @ColumnDefault("0.0")
     private Double averageRating = 0.0;
@@ -81,4 +84,12 @@ public class Product {
     @Column(name = "review_count")
     @ColumnDefault("0")
     private Integer reviewCount = 0;
+
+    @Lob
+    @Column(name = "care_guide")
+    private String careGuide;
+
+    @Column(nullable = false)
+    @ColumnDefault("false")
+    private boolean deleted = false;
 }

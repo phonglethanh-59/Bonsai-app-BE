@@ -1,5 +1,7 @@
 package com.vti.bevtilib.service;
 
+import com.vti.bevtilib.exception.BusinessException;
+import com.vti.bevtilib.exception.ResourceNotFoundException;
 import com.vti.bevtilib.model.User;
 import com.vti.bevtilib.model.UserDetail;
 import com.vti.bevtilib.repository.UserDetailRepository;
@@ -7,6 +9,7 @@ import com.vti.bevtilib.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -15,6 +18,7 @@ import com.vti.bevtilib.dto.AdminUserUpdateDTO;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.regex.Pattern;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -29,6 +33,18 @@ import java.util.UUID;
 public class UserServiceImpl implements UserService {
     private final UserRepository userRepository;
     private final UserDetailRepository userDetailRepository;
+    private final PasswordEncoder passwordEncoder;
+
+    private static final Pattern EMAIL_PATTERN = Pattern.compile(
+            "^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$"
+    );
+
+    private void validateEmail(String email) {
+        if (StringUtils.hasText(email) && !EMAIL_PATTERN.matcher(email).matches()) {
+            throw new BusinessException("Email không đúng định dạng.");
+        }
+    }
+
     @Override
     @Transactional(readOnly = true)
     public Optional<User> findByUsername(String username) {
@@ -48,18 +64,17 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public User updateReaderProfile(String username, UserDetail userDetailFromForm) throws Exception {
+    public User updateReaderProfile(String username, UserDetail userDetailFromForm) {
         User currentUser = userRepository.findByUsername(username)
-                .orElseThrow(() -> new Exception("Không tìm thấy người dùng: " + username));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng: " + username));
 
-        // --- BẮT ĐẦU LOGIC VALIDATION MỚI ---
+        validateEmail(userDetailFromForm.getEmail());
         if (StringUtils.hasText(userDetailFromForm.getEmail()) && emailExistsForOtherUser(userDetailFromForm.getEmail(), currentUser.getUserId())) {
-            throw new Exception("Email này đã được sử dụng bởi một tài khoản khác.");
+            throw new BusinessException("Email này đã được sử dụng bởi một tài khoản khác.");
         }
         if (StringUtils.hasText(userDetailFromForm.getPhone()) && phoneExistsForOtherUser(userDetailFromForm.getPhone(), currentUser.getUserId())) {
-            throw new Exception("Số điện thoại này đã được sử dụng bởi một tài khoản khác.");
+            throw new BusinessException("Số điện thoại này đã được sử dụng bởi một tài khoản khác.");
         }
-        // --- KẾT THÚC LOGIC VALIDATION ---
 
         UserDetail detailsToUpdate = currentUser.getUserDetail();
         if (detailsToUpdate == null) {
@@ -77,10 +92,11 @@ public class UserServiceImpl implements UserService {
         currentUser.setUserDetail(detailsToUpdate);
         return userRepository.save(currentUser);
     }
+
     @Override
-    public User updateUserAvatar(String username, MultipartFile avatarFile) throws IOException, Exception {
+    public User updateUserAvatar(String username, MultipartFile avatarFile) throws IOException {
         User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new Exception("Không tìm thấy người dùng"));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng"));
 
         UserDetail userDetail = user.getUserDetail();
         if (userDetail == null) {
@@ -95,31 +111,51 @@ public class UserServiceImpl implements UserService {
         return userRepository.save(user);
     }
 
-    // Hàm tiện ích để lưu file
     private String saveFile(MultipartFile file, String subDir) throws IOException {
         Path uploadPath = Paths.get("uploads", subDir);
         if (!Files.exists(uploadPath)) {
             Files.createDirectories(uploadPath);
         }
 
-        String originalFilename = StringUtils.cleanPath(file.getOriginalFilename());
-        String uniqueFilename = UUID.randomUUID().toString() + "_" + originalFilename;
+        String originalFilename = file.getOriginalFilename();
+        String extension = "";
+        if (originalFilename != null && originalFilename.contains(".")) {
+            extension = originalFilename.substring(originalFilename.lastIndexOf("."));
+        }
+        if (!extension.matches("\\.(jpg|jpeg|png|gif|webp)")) {
+            throw new IOException("Chỉ cho phép upload file ảnh (jpg, jpeg, png, gif, webp).");
+        }
+        String uniqueFilename = UUID.randomUUID().toString() + extension;
+
+        Path filePath = uploadPath.resolve(uniqueFilename);
+        if (!filePath.normalize().startsWith(uploadPath.normalize())) {
+            throw new IOException("Đường dẫn file không hợp lệ.");
+        }
 
         try (InputStream inputStream = file.getInputStream()) {
-            Path filePath = uploadPath.resolve(uniqueFilename);
             Files.copy(inputStream, filePath, StandardCopyOption.REPLACE_EXISTING);
         }
 
         return "/uploads/" + subDir + "/" + uniqueFilename;
     }
+
     @Override
-    public User adminUpdateUser(String userId, AdminUserUpdateDTO updateDto, String currentAdminUsername) throws Exception {
+    public User adminUpdateUser(String userId, AdminUserUpdateDTO updateDto, String currentAdminUsername) {
         User userToUpdate = userRepository.findById(userId)
-                .orElseThrow(() -> new Exception("Không tìm thấy người dùng với ID: " + userId));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng với ID: " + userId));
 
         // Ràng buộc: Admin không thể tự khóa tài khoản của mình
         if (userToUpdate.getUsername().equals(currentAdminUsername) && updateDto.getStatus() != null && !updateDto.getStatus()) {
-            throw new Exception("Admin không thể tự khóa tài khoản của chính mình.");
+            throw new BusinessException("Admin không thể tự khóa tài khoản của chính mình.");
+        }
+
+        // Validate email format + trùng lặp
+        validateEmail(updateDto.getEmail());
+        if (StringUtils.hasText(updateDto.getEmail()) && emailExistsForOtherUser(updateDto.getEmail(), userId)) {
+            throw new BusinessException("Email này đã được sử dụng bởi một tài khoản khác.");
+        }
+        if (StringUtils.hasText(updateDto.getPhone()) && phoneExistsForOtherUser(updateDto.getPhone(), userId)) {
+            throw new BusinessException("Số điện thoại này đã được sử dụng bởi một tài khoản khác.");
         }
 
         UserDetail detail = userToUpdate.getUserDetail();
@@ -128,7 +164,6 @@ public class UserServiceImpl implements UserService {
             detail.setUser(userToUpdate);
         }
 
-        // Cập nhật thông tin từ DTO
         detail.setFullName(updateDto.getFullName());
         detail.setEmail(updateDto.getEmail());
         detail.setPhone(updateDto.getPhone());
@@ -146,17 +181,15 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public User adminUpdateUserRole(String userId, String newRole) throws Exception {
+    public User adminUpdateUserRole(String userId, String newRole) {
         User userToUpdate = userRepository.findById(userId)
-                .orElseThrow(() -> new Exception("Không tìm thấy người dùng với ID: " + userId));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng với ID: " + userId));
 
-        // Ràng buộc: Không thể phân quyền cho tài khoản ADMIN
         if ("ADMIN".equalsIgnoreCase(userToUpdate.getRole())) {
-            throw new Exception("Không thể thay đổi vai trò của tài khoản ADMIN.");
+            throw new BusinessException("Không thể thay đổi vai trò của tài khoản ADMIN.");
         }
-        // Ràng buộc: Chỉ cho phép phân quyền thành STAFF hoặc READER
         if (!"STAFF".equalsIgnoreCase(newRole) && !"CUSTOMER".equalsIgnoreCase(newRole)) {
-            throw new Exception("Vai trò mới không hợp lệ. Chỉ chấp nhận STAFF hoặc CUSTOMER.");
+            throw new BusinessException("Vai trò mới không hợp lệ. Chỉ chấp nhận STAFF hoặc CUSTOMER.");
         }
 
         userToUpdate.setRole(newRole.toUpperCase());
@@ -171,13 +204,13 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @Transactional(readOnly = true)
-    public User getUserById(String userId) throws Exception {
+    public User getUserById(String userId) {
         return userRepository.findById(userId)
-                .orElseThrow(() -> new Exception("Không tìm thấy người dùng với ID: " + userId));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng với ID: " + userId));
     }
 
     @Override
-    public User createUser(Map<String, Object> userData) throws Exception {
+    public User createUser(Map<String, Object> userData) {
         String username = (String) userData.get("username");
         String password = (String) userData.get("password");
         String role = (String) userData.get("role");
@@ -187,32 +220,34 @@ public class UserServiceImpl implements UserService {
         String address = (String) userData.get("address");
         String gender = (String) userData.get("gender");
 
-        // Validate required fields
         if (username == null || username.trim().isEmpty()) {
-            throw new Exception("Tên đăng nhập không được để trống");
+            throw new BusinessException("Tên đăng nhập không được để trống");
         }
         if (password == null || password.trim().isEmpty()) {
-            throw new Exception("Mật khẩu không được để trống");
+            throw new BusinessException("Mật khẩu không được để trống");
         }
         if (role == null || role.trim().isEmpty()) {
-            throw new Exception("Vai trò không được để trống");
+            throw new BusinessException("Vai trò không được để trống");
         }
 
-        // Check if username already exists
         if (userRepository.existsByUsername(username)) {
-            throw new Exception("Tên đăng nhập đã tồn tại");
+            throw new BusinessException("Tên đăng nhập đã tồn tại");
         }
 
-        // Create new user
+        // Validate email format + trùng lặp
+        validateEmail(email);
+        if (StringUtils.hasText(email) && userRepository.existsByUserDetail_Email(email)) {
+            throw new BusinessException("Email này đã được sử dụng bởi một tài khoản khác.");
+        }
+
         User newUser = User.builder()
                 .userId(UUID.randomUUID().toString())
                 .username(username)
-                .password(password) // In production, this should be encrypted
+                .password(passwordEncoder.encode(password))
                 .role(role.toUpperCase())
                 .status(true)
                 .build();
 
-        // Create user detail if provided
         if (fullName != null || email != null || phone != null || address != null || gender != null) {
             UserDetail userDetail = new UserDetail();
             userDetail.setUser(newUser);
@@ -228,36 +263,32 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public void deleteUser(String userId, String currentAdminUsername) throws Exception {
+    public void deleteUser(String userId, String currentAdminUsername) {
         User userToDelete = userRepository.findById(userId)
-                .orElseThrow(() -> new Exception("Không tìm thấy người dùng với ID: " + userId));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng với ID: " + userId));
 
-        // Ràng buộc: Admin không thể xóa chính mình
         if (userToDelete.getUsername().equals(currentAdminUsername)) {
-            throw new Exception("Admin không thể xóa tài khoản của chính mình");
+            throw new BusinessException("Admin không thể xóa tài khoản của chính mình");
         }
 
-        // Ràng buộc: Không thể xóa tài khoản ADMIN
         if ("ADMIN".equalsIgnoreCase(userToDelete.getRole())) {
-            throw new Exception("Không thể xóa tài khoản ADMIN");
+            throw new BusinessException("Không thể xóa tài khoản ADMIN");
         }
 
         userRepository.delete(userToDelete);
     }
 
     @Override
-    public User toggleUserStatus(String userId, String currentAdminUsername) throws Exception {
+    public User toggleUserStatus(String userId, String currentAdminUsername) {
         User userToToggle = userRepository.findById(userId)
-                .orElseThrow(() -> new Exception("Không tìm thấy người dùng với ID: " + userId));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng với ID: " + userId));
 
-        // Ràng buộc: Admin không thể khóa chính mình
         if (userToToggle.getUsername().equals(currentAdminUsername)) {
-            throw new Exception("Admin không thể khóa tài khoản của chính mình");
+            throw new BusinessException("Admin không thể khóa tài khoản của chính mình");
         }
 
-        // Ràng buộc: Không thể khóa tài khoản ADMIN
         if ("ADMIN".equalsIgnoreCase(userToToggle.getRole())) {
-            throw new Exception("Không thể khóa tài khoản ADMIN");
+            throw new BusinessException("Không thể khóa tài khoản ADMIN");
         }
 
         userToToggle.setStatus(!userToToggle.isStatus());
