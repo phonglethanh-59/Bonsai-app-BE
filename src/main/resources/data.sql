@@ -1,3 +1,6 @@
+-- Fix version NULL cho products đã tồn tại
+UPDATE products SET version = 0 WHERE version IS NULL;
+
 -- Admin account (username: admin, password: 123456)
 INSERT IGNORE INTO users (user_id, username, password, role, status, created_at) VALUES
 ('U0001', 'admin', '$2a$12$gga6/JBsOQsLvoG5zqaLZuMoUj2MhO4cs73fOetmtp30xV8vvb0tG', 'ADMIN', true, NOW());

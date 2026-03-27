@@ -13,6 +13,7 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
     List<Review> findByProduct_IdOrderByReviewDateDesc(Long productId);
     Page<Review> findByProduct_IdOrderByReviewDateDesc(Long productId, Pageable pageable);
     boolean existsByProduct_IdAndUser_UserId(Long productId, String userId);
+    Page<Review> findAllByOrderByReviewDateDesc(Pageable pageable);
 
     @Query("SELECT COALESCE(AVG(r.rating), 0.0) FROM Review r WHERE r.product.id = :productId")
     double averageRatingByProductId(@Param("productId") Long productId);

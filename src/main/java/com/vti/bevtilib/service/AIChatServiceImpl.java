@@ -2,7 +2,6 @@ package com.vti.bevtilib.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 
@@ -13,14 +12,13 @@ import java.util.*;
 @RequiredArgsConstructor
 public class AIChatServiceImpl implements AIChatService {
 
-    private final WebClient geminiWebClient;
+    private final WebClient aiWebClient;
 
-    @Value("${gemini.api.key}")
-    private String apiKey;
+    private static final String MODEL = "llama-3.3-70b-versatile";
 
     private static final String SYSTEM_PROMPT = """
             Bạn là chuyên gia tư vấn cây cảnh và bonsai với nhiều năm kinh nghiệm. Bạn giúp người dùng:
-            1. Đánh giá tình trạng sức khỏe của cây qua mô tả hoặc hình ảnh
+            1. Đánh giá tình trạng sức khỏe của cây qua mô tả
             2. Hướng dẫn cách chăm sóc, tưới nước, bón phân, cắt tỉa cho từng loại cây
             3. Chẩn đoán bệnh cây và đề xuất cách phòng/chữa trị
             4. Tư vấn loại cây phù hợp với điều kiện thời tiết, khí hậu từng vùng miền Việt Nam
@@ -29,7 +27,6 @@ public class AIChatServiceImpl implements AIChatService {
             Quy tắc trả lời:
             - Luôn trả lời bằng tiếng Việt
             - Ngắn gọn, dễ hiểu, thực tế
-            - Nếu phân tích ảnh, mô tả chi tiết những gì thấy được và đưa ra đánh giá
             - Nếu được hỏi về thời tiết/vùng miền, tư vấn dựa trên kiến thức khí hậu Việt Nam
             - Sử dụng emoji phù hợp để câu trả lời sinh động hơn
             """;
@@ -37,34 +34,30 @@ public class AIChatServiceImpl implements AIChatService {
     @Override
     public String chat(String message, String imageBase64, String location) {
         try {
-            String model = "gemini-1.5-flash";
-
             String fullMessage = buildMessage(message, location);
-
             Map<String, Object> requestBody = buildRequestBody(fullMessage, imageBase64);
 
-            log.info("Gọi Gemini API với model: {}", model);
+            log.info("Gọi Groq API với model: {}", MODEL);
 
-            Map response = geminiWebClient
+            Map response = aiWebClient
                     .post()
-                    .uri("/{model}:generateContent?key={key}", model, apiKey)
-                    .header("Content-Type", "application/json")
+                    .uri("/chat/completions")
                     .bodyValue(requestBody)
                     .retrieve()
                     .onStatus(status -> status.isError(), clientResponse -> {
                         return clientResponse.bodyToMono(String.class)
                                 .map(body -> {
-                                    log.error("Gemini API error: status={}, body={}", clientResponse.statusCode(), body);
-                                    return new RuntimeException("Gemini API error: " + body);
+                                    log.error("Groq API error: status={}, body={}", clientResponse.statusCode(), body);
+                                    return new RuntimeException("Groq API error: " + body);
                                 });
                     })
                     .bodyToMono(Map.class)
                     .block();
 
-            log.info("Gemini API response received");
+            log.info("Groq API response received");
             return extractReply(response);
         } catch (Exception e) {
-            log.error("Lỗi khi gọi Gemini API: {}", e.getMessage(), e);
+            log.error("Lỗi khi gọi Groq API: {}", e.getMessage(), e);
             return "Xin lỗi, hiện tại hệ thống AI đang gặp sự cố. Vui lòng thử lại sau. Chi tiết: " + e.getMessage();
         }
     }
@@ -80,51 +73,41 @@ public class AIChatServiceImpl implements AIChatService {
     }
 
     private Map<String, Object> buildRequestBody(String message, String imageBase64) {
-        List<Map<String, Object>> parts = new ArrayList<>();
+        List<Map<String, Object>> messages = new ArrayList<>();
 
-        // System instruction
-        Map<String, Object> systemInstruction = new HashMap<>();
-        systemInstruction.put("parts", List.of(Map.of("text", SYSTEM_PROMPT)));
+        // System message
+        messages.add(Map.of("role", "system", "content", SYSTEM_PROMPT));
 
-        // User message text
-        parts.add(Map.of("text", message));
-
-        // Image if provided
+        // User message
         if (imageBase64 != null && !imageBase64.isEmpty()) {
-            String cleanBase64 = imageBase64;
-            String mimeType = "image/jpeg";
+            // Vision request with image
+            List<Map<String, Object>> contentParts = new ArrayList<>();
+            contentParts.add(Map.of("type", "text", "text", message));
 
-            if (imageBase64.contains(",")) {
-                String[] split = imageBase64.split(",");
-                cleanBase64 = split[1];
-                if (split[0].contains("png")) mimeType = "image/png";
-                else if (split[0].contains("webp")) mimeType = "image/webp";
-                else if (split[0].contains("gif")) mimeType = "image/gif";
+            String imageUrl = imageBase64;
+            if (!imageBase64.startsWith("data:")) {
+                imageUrl = "data:image/jpeg;base64," + imageBase64;
             }
 
-            Map<String, Object> inlineData = new HashMap<>();
-            inlineData.put("mimeType", mimeType);
-            inlineData.put("data", cleanBase64);
-            parts.add(Map.of("inlineData", inlineData));
+            contentParts.add(Map.of(
+                    "type", "image_url",
+                    "image_url", Map.of("url", imageUrl)
+            ));
+
+            Map<String, Object> userMessage = new HashMap<>();
+            userMessage.put("role", "user");
+            userMessage.put("content", contentParts);
+            messages.add(userMessage);
+        } else {
+            // Text-only request
+            messages.add(Map.of("role", "user", "content", message));
         }
 
-        Map<String, Object> content = new HashMap<>();
-        content.put("parts", parts);
-        content.put("role", "user");
-
         Map<String, Object> requestBody = new HashMap<>();
-        requestBody.put("contents", List.of(content));
-        requestBody.put("systemInstruction", systemInstruction);
-
-        // Safety settings
-        List<Map<String, String>> safetySettings = List.of(
-                Map.of("category", "HARM_CATEGORY_HARASSMENT", "threshold", "BLOCK_NONE"),
-                Map.of("category", "HARM_CATEGORY_HATE_SPEECH", "threshold", "BLOCK_NONE"),
-                Map.of("category", "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold", "BLOCK_NONE"),
-                Map.of("category", "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold", "BLOCK_NONE")
-        );
-        requestBody.put("safetySettings", safetySettings);
-
+        requestBody.put("model", MODEL);
+        requestBody.put("messages", messages);
+        requestBody.put("max_tokens", 2048);
+        requestBody.put("temperature", 0.7);
         return requestBody;
     }
 
@@ -133,14 +116,13 @@ public class AIChatServiceImpl implements AIChatService {
         if (response == null) return "Không nhận được phản hồi từ AI.";
 
         try {
-            List<Map> candidates = (List<Map>) response.get("candidates");
-            if (candidates == null || candidates.isEmpty()) return "AI không thể trả lời câu hỏi này.";
+            List<Map> choices = (List<Map>) response.get("choices");
+            if (choices == null || choices.isEmpty()) return "AI không thể trả lời câu hỏi này.";
 
-            Map content = (Map) candidates.get(0).get("content");
-            List<Map> parts = (List<Map>) content.get("parts");
-            return (String) parts.get(0).get("text");
+            Map messageMap = (Map) choices.get(0).get("message");
+            return (String) messageMap.get("content");
         } catch (Exception e) {
-            log.error("Lỗi parse response từ Gemini: ", e);
+            log.error("Lỗi parse response từ Groq: ", e);
             return "Có lỗi xảy ra khi xử lý phản hồi từ AI.";
         }
     }

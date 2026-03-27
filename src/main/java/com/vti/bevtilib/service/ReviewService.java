@@ -11,4 +11,8 @@ public interface ReviewService {
     List<ReviewDTO> getReviewsForProduct(Long productId);
     Page<ReviewDTO> getReviewsForProduct(Long productId, Pageable pageable);
     ReviewDTO createReview(User user, Long productId, int rating, String comment);
+    ReviewDTO updateReview(Long reviewId, User user, int rating, String comment);
+    void deleteReview(Long reviewId, User user);
+    void deleteReviewByAdmin(Long reviewId);
+    Page<ReviewDTO> getAllReviews(Pageable pageable);
 }

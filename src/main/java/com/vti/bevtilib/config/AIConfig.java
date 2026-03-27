@@ -6,15 +6,20 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.web.reactive.function.client.WebClient;
 
 @Configuration
-public class GeminiConfig {
+public class AIConfig {
 
-    @Value("${gemini.api.url}")
-    private String geminiApiUrl;
+    @Value("${groq.api.url}")
+    private String apiUrl;
+
+    @Value("${groq.api.key}")
+    private String apiKey;
 
     @Bean
-    public WebClient geminiWebClient() {
+    public WebClient aiWebClient() {
         return WebClient.builder()
-                .baseUrl(geminiApiUrl)
+                .baseUrl(apiUrl)
+                .defaultHeader("Authorization", "Bearer " + apiKey)
+                .defaultHeader("Content-Type", "application/json")
                 .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(10 * 1024 * 1024))
                 .build();
     }

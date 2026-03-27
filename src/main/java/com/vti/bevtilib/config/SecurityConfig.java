@@ -55,8 +55,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers("/admin/**").hasRole("ADMIN")
                         .requestMatchers("/staff/**").hasAnyRole("ADMIN", "STAFF")
-                        .requestMatchers("/api/customers/**", "/api/orders/**", "/api/cart/**", "/api/chat/**").authenticated()
-                        .requestMatchers("/api/reviews").authenticated()
+                        .requestMatchers("/api/customers/**", "/api/orders/**", "/api/cart/**", "/api/chat/**", "/api/wishlist/**").authenticated()
+                        .requestMatchers("/api/reviews", "/api/reviews/**").authenticated()
                         .anyRequest().authenticated()
                 )
                 .formLogin(form -> form

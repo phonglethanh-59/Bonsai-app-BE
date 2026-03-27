@@ -1,12 +1,16 @@
 package com.vti.bevtilib.controller;
 
+import com.vti.bevtilib.dto.DashboardStatsDTO;
 import com.vti.bevtilib.dto.OrderDTO;
+import com.vti.bevtilib.dto.ReviewDTO;
 import com.vti.bevtilib.exception.BusinessException;
 import com.vti.bevtilib.exception.ResourceNotFoundException;
 import com.vti.bevtilib.model.Category;
 import com.vti.bevtilib.model.Product;
+import com.vti.bevtilib.service.DashboardService;
 import com.vti.bevtilib.service.OrderService;
 import com.vti.bevtilib.service.ProductService;
+import com.vti.bevtilib.service.ReviewService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -30,7 +34,9 @@ public class AdminController {
     private final UserService userService;
     private final ProductService productService;
     private final OrderService orderService;
+    private final ReviewService reviewService;
     private final CategoryRepository categoryRepository;
+    private final DashboardService dashboardService;
 
     // ===================== USER MANAGEMENT =====================
 
@@ -178,11 +184,34 @@ public class AdminController {
         return ResponseEntity.ok(Map.of("message", "Cập nhật trạng thái đơn hàng thành công!", "order", order));
     }
 
+    // ===================== REVIEW MANAGEMENT =====================
+
+    @GetMapping("/reviews")
+    public ResponseEntity<Page<ReviewDTO>> getAllReviews(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        Pageable pageable = PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), 100));
+        Page<ReviewDTO> reviews = reviewService.getAllReviews(pageable);
+        return ResponseEntity.ok(reviews);
+    }
+
+    @DeleteMapping("/reviews/{reviewId}")
+    public ResponseEntity<?> deleteReview(@PathVariable Long reviewId) {
+        reviewService.deleteReviewByAdmin(reviewId);
+        return ResponseEntity.ok(Map.of("message", "Xóa đánh giá thành công!"));
+    }
+
     // ===================== DASHBOARD STATS =====================
 
     @GetMapping("/stats")
     public ResponseEntity<Map<String, Object>> getDashboardStats() {
         Map<String, Object> stats = userService.getDashboardStats();
+        return ResponseEntity.ok(stats);
+    }
+
+    @GetMapping("/dashboard-stats")
+    public ResponseEntity<DashboardStatsDTO> getAdvancedDashboardStats() {
+        DashboardStatsDTO stats = dashboardService.getAdvancedStats();
         return ResponseEntity.ok(stats);
     }
 }

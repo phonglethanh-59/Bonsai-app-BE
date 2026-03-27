@@ -75,7 +75,7 @@ public class Product {
     private LocalDateTime updatedAt;
 
     @Version
-    private Long version;
+    private Long version = 0L;
 
     @Column(name = "average_rating")
     @ColumnDefault("0.0")
