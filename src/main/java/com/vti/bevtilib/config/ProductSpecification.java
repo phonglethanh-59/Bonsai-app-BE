@@ -2,6 +2,7 @@ package com.vti.bevtilib.config;
 
 import com.vti.bevtilib.model.CareLevel;
 import com.vti.bevtilib.model.Product;
+import jakarta.persistence.criteria.Expression;
 import jakarta.persistence.criteria.Predicate;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.util.StringUtils;
@@ -24,11 +25,17 @@ public class ProductSpecification {
 
             if (StringUtils.hasText(keyword)) {
                 String likePattern = "%" + keyword.toLowerCase() + "%";
-                predicates.add(cb.or(
-                        cb.like(cb.lower(root.get("name")), likePattern),
-                        cb.like(cb.lower(root.get("origin")), likePattern),
-                        cb.like(cb.lower(root.get("description")), likePattern)
-                ));
+
+                // Tìm trên name và origin (VARCHAR - an toàn với lower/like)
+                Predicate namePred = cb.like(cb.lower(root.get("name")), likePattern);
+                Predicate originPred = cb.like(cb.lower(root.get("origin")), likePattern);
+                Predicate skuPred = cb.like(cb.lower(root.get("sku")), likePattern);
+
+                // Tìm trên description (LONGTEXT) - cast sang String để tránh lỗi Hibernate với @Lob
+                Expression<String> descAsString = root.get("description").as(String.class);
+                Predicate descPred = cb.like(cb.lower(descAsString), likePattern);
+
+                predicates.add(cb.or(namePred, originPred, skuPred, descPred));
             }
 
             if (categoryId != null && categoryId > 0) {

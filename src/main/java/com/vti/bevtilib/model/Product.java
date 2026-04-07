@@ -10,6 +10,8 @@ import org.hibernate.annotations.UpdateTimestamp;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "products")
@@ -26,7 +28,7 @@ public class Product {
     @Column(nullable = false)
     private String name;
 
-    @Lob
+    @Column(columnDefinition = "TEXT")
     private String description;
 
     @Column(nullable = false, precision = 12, scale = 0)
@@ -85,11 +87,14 @@ public class Product {
     @ColumnDefault("0")
     private Integer reviewCount = 0;
 
-    @Lob
-    @Column(name = "care_guide")
+    @Column(name = "care_guide", columnDefinition = "TEXT")
     private String careGuide;
 
     @Column(nullable = false)
     @ColumnDefault("false")
     private boolean deleted = false;
+
+    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @OrderBy("displayOrder ASC")
+    private List<ProductImage> images = new ArrayList<>();
 }

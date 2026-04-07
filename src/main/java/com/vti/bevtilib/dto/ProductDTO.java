@@ -4,6 +4,7 @@ import lombok.Data;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 public class ProductDTO {
@@ -25,5 +26,6 @@ public class ProductDTO {
     private Integer reviewCount;
     private String careGuide;
     private CategoryDTO category;
+    private List<String> images;
     private LocalDateTime createdAt;
 }

@@ -18,4 +18,6 @@ public interface ProductService {
     Product updateProduct(Long id, Product product);
     void deleteProduct(Long id);
     List<ProductDTO> getRelatedProducts(Long productId);
+    Product getProductById(Long id);
+    Product saveProduct(Product product);
 }

@@ -1,10 +1,7 @@
 package com.vti.bevtilib.dto;
 
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotEmpty;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.*;
 import lombok.Data;
 import java.util.List;
 
@@ -14,6 +11,7 @@ public class OrderRequestDTO {
     private String shippingAddress;
 
     @NotBlank(message = "Số điện thoại không được để trống.")
+    @Pattern(regexp = "^(0[3|5|7|8|9])[0-9]{8}$", message = "Số điện thoại không hợp lệ. Vui lòng nhập SĐT Việt Nam (VD: 0901234567).")
     private String phone;
 
     private String note;
