@@ -52,11 +52,22 @@ public class SecurityConfig {
                                 "/uploads/**",
                                 "/", "/about", "/contact", "/categories"
                         ).permitAll()
+                        // Community: đọc public, viết cần đăng nhập
+                        .requestMatchers(org.springframework.http.HttpMethod.GET,
+                                "/api/community/posts",
+                                "/api/community/posts/*",
+                                "/api/community/posts/*/comments",
+                                "/api/community/users/*/profile",
+                                "/api/community/users/*/posts",
+                                "/api/community/tags/trending",
+                                "/api/community/tags/search"
+                        ).permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers("/admin/**").hasRole("ADMIN")
                         .requestMatchers("/staff/**").hasAnyRole("ADMIN", "STAFF")
                         .requestMatchers("/api/customers/**", "/api/orders/**", "/api/cart/**", "/api/chat/**", "/api/wishlist/**").authenticated()
                         .requestMatchers("/api/reviews", "/api/reviews/**").authenticated()
+                        .requestMatchers("/api/community/**").authenticated()
                         .anyRequest().authenticated()
                 )
                 .formLogin(form -> form
