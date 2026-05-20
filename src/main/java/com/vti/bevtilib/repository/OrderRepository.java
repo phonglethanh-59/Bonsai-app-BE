@@ -31,13 +31,13 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     @Query(value = "SELECT p.name, SUM(oi.quantity), SUM(oi.price * oi.quantity) FROM order_items oi JOIN orders o ON oi.order_id = o.id JOIN products p ON oi.product_id = p.id WHERE o.status = 'DELIVERED' AND o.order_date BETWEEN :from AND :to GROUP BY p.name ORDER BY SUM(oi.price * oi.quantity) DESC", nativeQuery = true)
     List<Object[]> findTopProductsByRevenue(@Param("from") LocalDateTime from, @Param("to") LocalDateTime to);
 
-    @Query("SELECT DISTINCT o FROM Order o LEFT JOIN FETCH o.orderItems oi LEFT JOIN FETCH oi.product LEFT JOIN FETCH o.user WHERE o.orderDate BETWEEN :from AND :to ORDER BY o.orderDate DESC")
+    @Query("SELECT DISTINCT o FROM Order o LEFT JOIN FETCH o.orderItems oi LEFT JOIN FETCH oi.product LEFT JOIN FETCH o.user u LEFT JOIN FETCH u.userDetail WHERE o.orderDate BETWEEN :from AND :to ORDER BY o.orderDate DESC")
     List<Order> findAllByDateRange(@Param("from") LocalDateTime from, @Param("to") LocalDateTime to);
 
-    @Query("SELECT DISTINCT o FROM Order o LEFT JOIN FETCH o.orderItems oi LEFT JOIN FETCH oi.product LEFT JOIN FETCH o.user WHERE o.status = :status AND o.orderDate BETWEEN :from AND :to ORDER BY o.orderDate DESC")
+    @Query("SELECT DISTINCT o FROM Order o LEFT JOIN FETCH o.orderItems oi LEFT JOIN FETCH oi.product LEFT JOIN FETCH o.user u LEFT JOIN FETCH u.userDetail WHERE o.status = :status AND o.orderDate BETWEEN :from AND :to ORDER BY o.orderDate DESC")
     List<Order> findAllByStatusAndDateRange(@Param("status") OrderStatus status, @Param("from") LocalDateTime from, @Param("to") LocalDateTime to);
 
-    @Query("SELECT DISTINCT o FROM Order o LEFT JOIN FETCH o.orderItems oi LEFT JOIN FETCH oi.product LEFT JOIN FETCH o.user ORDER BY o.orderDate DESC")
+    @Query("SELECT DISTINCT o FROM Order o LEFT JOIN FETCH o.orderItems oi LEFT JOIN FETCH oi.product LEFT JOIN FETCH o.user u LEFT JOIN FETCH u.userDetail ORDER BY o.orderDate DESC")
     List<Order> findAllWithItemsAndUser();
 
     // ========== Dashboard stats queries ==========
@@ -71,25 +71,29 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     @Query("SELECT COALESCE(SUM(o.totalAmount), 0) FROM Order o WHERE o.status = 'DELIVERED' AND o.orderDate >= :since")
     java.math.BigDecimal sumRevenueSince(@Param("since") LocalDateTime since);
 
-    @Query("SELECT DISTINCT o FROM Order o LEFT JOIN FETCH o.orderItems oi LEFT JOIN FETCH oi.product WHERE o.user.userId = :userId ORDER BY o.orderDate DESC")
+    // ========== User orders (customer-facing) ==========
+
+    @Query("SELECT DISTINCT o FROM Order o LEFT JOIN FETCH o.orderItems oi LEFT JOIN FETCH oi.product LEFT JOIN FETCH o.user u LEFT JOIN FETCH u.userDetail WHERE o.user.userId = :userId ORDER BY o.orderDate DESC")
     List<Order> findByUserWithItems(@Param("userId") String userId);
 
-    @Query(value = "SELECT DISTINCT o FROM Order o LEFT JOIN FETCH o.orderItems oi LEFT JOIN FETCH oi.product WHERE o.user.userId = :userId",
+    @Query(value = "SELECT DISTINCT o FROM Order o LEFT JOIN FETCH o.orderItems oi LEFT JOIN FETCH oi.product LEFT JOIN FETCH o.user u LEFT JOIN FETCH u.userDetail WHERE o.user.userId = :userId",
            countQuery = "SELECT COUNT(o) FROM Order o WHERE o.user.userId = :userId")
     Page<Order> findByUserWithItems(@Param("userId") String userId, Pageable pageable);
 
-    @Query(value = "SELECT DISTINCT o FROM Order o LEFT JOIN FETCH o.orderItems oi LEFT JOIN FETCH oi.product WHERE o.user.userId = :userId AND o.status = :status",
+    @Query(value = "SELECT DISTINCT o FROM Order o LEFT JOIN FETCH o.orderItems oi LEFT JOIN FETCH oi.product LEFT JOIN FETCH o.user u LEFT JOIN FETCH u.userDetail WHERE o.user.userId = :userId AND o.status = :status",
            countQuery = "SELECT COUNT(o) FROM Order o WHERE o.user.userId = :userId AND o.status = :status")
     Page<Order> findByUserAndStatusWithItems(@Param("userId") String userId, @Param("status") OrderStatus status, Pageable pageable);
 
-    @Query(value = "SELECT DISTINCT o FROM Order o LEFT JOIN FETCH o.orderItems oi LEFT JOIN FETCH oi.product",
+    // ========== Admin orders ==========
+
+    @Query(value = "SELECT DISTINCT o FROM Order o LEFT JOIN FETCH o.orderItems oi LEFT JOIN FETCH oi.product LEFT JOIN FETCH o.user u LEFT JOIN FETCH u.userDetail",
            countQuery = "SELECT COUNT(o) FROM Order o")
     Page<Order> findAllWithItems(Pageable pageable);
 
-    @Query(value = "SELECT DISTINCT o FROM Order o LEFT JOIN FETCH o.orderItems oi LEFT JOIN FETCH oi.product WHERE o.status = :status",
+    @Query(value = "SELECT DISTINCT o FROM Order o LEFT JOIN FETCH o.orderItems oi LEFT JOIN FETCH oi.product LEFT JOIN FETCH o.user u LEFT JOIN FETCH u.userDetail WHERE o.status = :status",
            countQuery = "SELECT COUNT(o) FROM Order o WHERE o.status = :status")
     Page<Order> findByStatusWithItems(@Param("status") OrderStatus status, Pageable pageable);
 
-    @Query("SELECT DISTINCT o FROM Order o LEFT JOIN FETCH o.orderItems oi LEFT JOIN FETCH oi.product WHERE o.id = :id")
+    @Query("SELECT DISTINCT o FROM Order o LEFT JOIN FETCH o.orderItems oi LEFT JOIN FETCH oi.product LEFT JOIN FETCH o.user u LEFT JOIN FETCH u.userDetail WHERE o.id = :id")
     Optional<Order> findByIdWithItems(@Param("id") Long id);
 }

@@ -11,6 +11,8 @@ import java.util.List;
 @Builder
 public class OrderDTO {
     private Long id;
+    private String username;
+    private String customerName;
     private LocalDateTime orderDate;
     private BigDecimal totalAmount;
     private String shippingAddress;

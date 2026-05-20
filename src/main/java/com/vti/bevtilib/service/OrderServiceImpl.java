@@ -210,8 +210,22 @@ public class OrderServiceImpl implements OrderService {
                         .build())
                 .collect(Collectors.toList());
 
+        // Lấy tên khách hàng từ UserDetail hoặc username
+        String customerName = null;
+        String username = null;
+        if (order.getUser() != null) {
+            username = order.getUser().getUsername();
+            if (order.getUser().getUserDetail() != null && order.getUser().getUserDetail().getFullName() != null) {
+                customerName = order.getUser().getUserDetail().getFullName();
+            } else {
+                customerName = username;
+            }
+        }
+
         return OrderDTO.builder()
                 .id(order.getId())
+                .username(username)
+                .customerName(customerName)
                 .orderDate(order.getOrderDate())
                 .totalAmount(order.getTotalAmount())
                 .shippingAddress(order.getShippingAddress())

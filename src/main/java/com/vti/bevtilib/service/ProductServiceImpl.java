@@ -109,6 +109,19 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Override
+    public Product getProductById(Long id) {
+        return productRepository.findById(id)
+                .filter(p -> !p.isDeleted())
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy sản phẩm với ID: " + id));
+    }
+
+    @Override
+    @Transactional
+    public Product saveProduct(Product product) {
+        return productRepository.save(product);
+    }
+
+    @Override
     public List<ProductDTO> getRelatedProducts(Long productId) {
         Product product = productRepository.findById(productId)
                 .filter(p -> !p.isDeleted())
@@ -144,6 +157,15 @@ public class ProductServiceImpl implements ProductService {
         dto.setReviewCount(product.getReviewCount());
         dto.setCareGuide(product.getCareGuide());
         dto.setCreatedAt(product.getCreatedAt());
+
+        // Map images
+        if (product.getImages() != null && !product.getImages().isEmpty()) {
+            dto.setImages(product.getImages().stream()
+                    .map(com.vti.bevtilib.model.ProductImage::getImageUrl)
+                    .collect(java.util.stream.Collectors.toList()));
+        } else {
+            dto.setImages(java.util.List.of());
+        }
 
         if (product.getCategory() != null) {
             CategoryDTO catDto = new CategoryDTO();
